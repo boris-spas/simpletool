@@ -54,8 +54,12 @@ import org.graalvm.options.OptionStability;
 import org.graalvm.options.OptionValues;
 
 import com.oracle.truffle.api.Option;
+import com.oracle.truffle.api.frame.VirtualFrame;
+import com.oracle.truffle.api.instrumentation.EventContext;
+import com.oracle.truffle.api.instrumentation.ExecutionEventListener;
 import com.oracle.truffle.api.instrumentation.Instrumenter;
 import com.oracle.truffle.api.instrumentation.SourceSectionFilter;
+import com.oracle.truffle.api.instrumentation.StandardTags;
 import com.oracle.truffle.api.instrumentation.StandardTags.ExpressionTag;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument;
 import com.oracle.truffle.api.instrumentation.TruffleInstrument.Registration;
@@ -166,11 +170,56 @@ public final class SimpleCoverageInstrument extends TruffleInstrument {
      *
      * @param env The environment, used to get the {@link Instrumenter}
      */
+    static final boolean dontCrash = Boolean.getBoolean("dontCrash");
     private void enable(final Env env) {
-        SourceSectionFilter filter = SourceSectionFilter.newBuilder().tagIs(ExpressionTag.class).includeInternal(false).build();
-        Instrumenter instrumenter = env.getInstrumenter();
-        instrumenter.attachLoadSourceSectionListener(filter, new GatherSourceSectionsListener(this), true);
-        instrumenter.attachExecutionEventFactory(filter, new CoverageEventFactory(this));
+        SourceSectionFilter sourceSectionFilter = SourceSectionFilter.newBuilder()
+                .tagIs(StandardTags.RootTag.class)
+                .rootNameIs(s -> {
+                    if (dontCrash) {
+                        if (s != null) {
+                            return s.equals("func1");
+                        } else {
+                            return false;
+                        }
+                    } else {
+                        return s.equals("func1");
+                    }
+                })
+                .build();
+        env.getInstrumenter().attachExecutionEventListener(sourceSectionFilter, new MyListener());
+
+//        SourceSectionFilter filter = SourceSectionFilter.newBuilder().tagIs(ExpressionTag.class).includeInternal(false).build();
+//        Instrumenter instrumenter = env.getInstrumenter();
+//        instrumenter.attachLoadSourceSectionListener(filter, new GatherSourceSectionsListener(this), true);
+//        instrumenter.attachExecutionEventFactory(filter, new CoverageEventFactory(this));
+    }
+
+    class MyListener implements ExecutionEventListener {
+
+        @Override
+        public void onEnter(EventContext context, VirtualFrame frame) {
+//            System.out.println("onEnter");
+        }
+
+        @Override
+        public void onReturnValue(EventContext context, VirtualFrame frame, Object result) {
+//            System.out.println("onReturnValue");
+        }
+
+        @Override
+        public void onReturnExceptional(EventContext context, VirtualFrame frame, Throwable exception) {
+//            System.out.println("onReturnExceptional");
+        }
+
+        @Override
+        public void onInputValue(EventContext context, VirtualFrame frame, EventContext inputContext, int inputIndex, Object inputValue) {
+//            System.out.println("onInputValue");
+        }
+
+        @Override
+        public Object onUnwind(EventContext context, VirtualFrame frame, Object info) {
+//            return ExecutionEventListener.super.onUnwind(context, frame, info); //To change body of generated methods, choose Tools | Templates.
+        }
     }
 
     /**
